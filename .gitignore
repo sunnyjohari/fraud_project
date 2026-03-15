@@ -1,0 +1,22 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ── Virtual environment ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Model files — large binaries, regenerated in CI ──────────────────────────
+# fraud_model.pkl is trained by train_and_save_model.py
+# It is NOT committed to Git — CI runs the training script instead.
+fraud_model.pkl
+*.pkl
+
+# ── Editor / OS ───────────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
