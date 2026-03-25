@@ -1,20 +1,13 @@
-# ── .github/workflows/ci.yml ──────────────────────────────────────────────────
-#
-# This file tells GitHub: "every time someone pushes code or opens a
-# pull request — run our test suite automatically."
-#
-# GitHub reads this file. You never run it manually.
-
 name: Continuous API Validation    # name shown in the GitHub Actions tab
 
-# ── TRIGGER: when does this workflow run? ─────────────────────────────────────
+# TRIGGER: when does this workflow run?
 on:
   push:
     branches: [ main ]             # runs on every push to main
   pull_request:
     branches: [ main ]             # runs on every PR targeting main
 
-# ── JOBS: what does it do? ────────────────────────────────────────────────────
+# JOBS: what does it do?
 jobs:
   test:
     name: Run API Tests
@@ -22,33 +15,33 @@ jobs:
 
     steps:
 
-      # ── Step 1: Get the code ────────────────────────────────────────────────
+      # Step 1: Get the code
       - name: Checkout repository
         uses: actions/checkout@v4
         # This clones your repo into the VM.
         # Without this — the VM has no code to run.
 
-      # ── Step 2: Set up Python ───────────────────────────────────────────────
+      # Step 2: Set up Python
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"             # cache pip downloads — speeds up reruns
 
-      # ── Step 3: Install dependencies ────────────────────────────────────────
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest httpx
 
-      # ── Step 4: Train the model ──────────────────────────────────────────────
+      # Step 4: Train the model
       - name: Train fraud detection model
         run: python train_and_save_model.py
         # fraud_model.pkl is NOT committed to Git (it's in .gitignore).
         # We regenerate it here from the training script.
         # This guarantees the model matches the current codebase.
 
-      # ── Step 5: Run the test suite ───────────────────────────────────────────
+      # Step 5: Run the test suite
       - name: Run pytest
         run: pytest tests/ -v
         # If any test fails → this step fails → the whole job fails →
