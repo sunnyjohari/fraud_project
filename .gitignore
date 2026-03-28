@@ -19,3 +19,6 @@ fraud_model.pkl
 .idea/
 .vscode/
 *.swp
+
+\.env
+.env

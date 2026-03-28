@@ -1,0 +1,45 @@
+# docker-compose.yml
+#
+# Docker Compose lets you define and start MULTIPLE containers
+# together with a single command: docker compose up
+#
+# Each top-level key under "services" is one container.
+# Compose handles the network between them automatically —
+# containers can reach each other by service name.
+
+services:
+
+  # ── Service 1: Our fraud detection API ──────────────────────────────────────
+  api:
+    build: .                      # build the image from Dockerfile in this folder
+    ports:
+      - "8000:8000"               # expose port 8000 on your machine
+    environment:
+      MODEL_PATH: /app/fraud_model.pkl
+      FRAUD_THRESHOLD: "0.5"
+      LOG_LEVEL: info
+    depends_on:
+      - redis                     # wait for redis to be ready before starting
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Service 2: Redis — in-memory data store ──────────────────────────────────
+  # Redis is commonly paired with ML APIs to:
+  #   - Cache predictions across multiple API workers
+  #   - Store rate-limiting counters
+  #   - Queue background jobs (e.g. batch inference)
+  #
+  # We use the official lightweight redis:7-alpine image.
+  # No Dockerfile needed — it's a pre-built public image.
+  redis:
+    image: redis:7-alpine          # official Redis 7, Alpine Linux base
+    ports:
+      - "6379:6379"               # expose Redis port for local inspection
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

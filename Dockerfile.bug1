@@ -1,0 +1,32 @@
+# Dockerfile.bug1 — BUILD-TIME FAILURE
+# Bug: requirements.txt is misspelled as requirments.txt
+# This causes a COPY failure — Docker can't find the file in the build context.
+#
+# Error you will see:
+#   COPY failed: file not found in build context or excluded by .dockerignore: stat requirments.txt: file does not exist
+
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+# ← BUG: "requirments" missing the 'e' in requirements
+COPY requirments.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+RUN python train_and_save_model.py
+
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+
+ENV MODEL_PATH=/app/fraud_model.pkl
+ENV FRAUD_THRESHOLD=0.5
+ENV LOG_LEVEL=info
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /app/main.py         ./main.py
+COPY --from=builder /app/fraud_model.pkl ./fraud_model.pkl
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

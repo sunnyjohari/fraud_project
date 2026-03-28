@@ -1,9 +1,4 @@
-"""
-Run this script ONCE before recording — it trains a small XGBoost model
-on synthetic fraud data and saves it to fraud_model.pkl
 
-"""
-  
 import numpy as np
 import joblib
 from xgboost import XGBClassifier

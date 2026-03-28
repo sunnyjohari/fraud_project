@@ -1,0 +1,33 @@
+# Dockerfile.bug2 — RUNTIME SILENT FAILURE
+# Bug: uvicorn bound to port 8080 inside the container, but we expose 8000.
+# Container starts fine. Browser hits port 8000. Nothing responds.
+#
+# Error you will see:
+#   curl: (7) Failed to connect to localhost port 8000: Connection refused
+#   docker logs shows: Uvicorn running on http://0.0.0.0:8080
+#
+# Fix: change --port 8080 back to --port 8000
+
+FROM python:3.12-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN python train_and_save_model.py
+
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+
+ENV MODEL_PATH=/app/fraud_model.pkl
+ENV FRAUD_THRESHOLD=0.5
+ENV LOG_LEVEL=info
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /app/main.py         ./main.py
+COPY --from=builder /app/fraud_model.pkl ./fraud_model.pkl
+
+EXPOSE 8000
+
+# ← BUG: port 8080 doesn't match EXPOSE 8000 or the -p 8000:8000 mapping
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

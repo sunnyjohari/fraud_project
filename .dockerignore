@@ -1,0 +1,43 @@
+# .dockerignore — controls what enters the Docker build context
+#
+# EVERY file listed here is excluded from "docker build ."
+# Smaller build context = faster build = smaller image
+
+# Virtual environment — NEVER copy local packages into the image
+# (the image installs its own packages from requirements.txt)
+venv/
+.venv/
+env/
+
+# Python cache — dead weight in an image
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Model file — regenerated at build time by train_and_save_model.py
+# Including it would: (a) bloat the build context and (b) risk using
+# a model trained on a different Python/XGBoost version
+fraud_model.pkl
+*.pkl
+
+# Dev-only files — never needed in a production container
+requirements-dev.txt
+tests/
+.github/
+verify_env.py
+Dockerfile.fat
+Dockerfile.bug1
+Dockerfile.bug2
+Dockerfile.bug3
+
+# Local config — sensitive, machine-specific
+.env
+*.env
+
+# Editor / OS / Git history
+.DS_Store
+.idea/
+.vscode/
+.git/
+.gitignore

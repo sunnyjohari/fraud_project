@@ -1,0 +1,36 @@
+# Dockerfile.bug3 — RUNTIME REQUEST FAILURE
+# Bug: MODEL_PATH points to a file that doesn't exist inside the container.
+# Container starts healthy. Health check at GET / passes.
+# First POST /predict crashes with a 500 error.
+#
+# Error you will see at runtime:
+#   HTTPException: 500 — Inference failed: [Errno 2] No such file or directory: '/app/wrong_path.pkl'
+#
+# How to diagnose:
+#   docker logs <container> — shows the 500 error on the prediction request
+#   docker exec -it <container> ls /app — shows what files are actually there
+#
+# Fix: change MODEL_PATH back to /app/fraud_model.pkl
+
+FROM python:3.12-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN python train_and_save_model.py
+
+FROM python:3.12-slim AS runtime
+WORKDIR /app
+
+# ← BUG: wrong filename — the model is fraud_model.pkl, not wrong_path.pkl
+ENV MODEL_PATH=/app/wrong_path.pkl
+ENV FRAUD_THRESHOLD=0.5
+ENV LOG_LEVEL=info
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /app/main.py         ./main.py
+COPY --from=builder /app/fraud_model.pkl ./fraud_model.pkl
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

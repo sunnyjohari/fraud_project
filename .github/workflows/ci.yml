@@ -1,50 +1,112 @@
-name: Continuous API Validation    # name shown in the GitHub Actions tab
+# .github/workflows/ci.yml
+#
+# Two jobs:
+#   1. test   — runs on every push AND pull_request to main
+#   2. docker — builds and pushes the image to GHCR (GitHub Container Registry)
+#              runs ONLY on push to main, and ONLY if job 1 passes
+#
+# GitHub Container Registry (ghcr.io):
+#   - Free for public repos, free tier for private
+#   - Uses GITHUB_TOKEN — no separate account or secret needed
+#   - Image address: ghcr.io/<your-github-username>/fraud-api:<tag>
 
-# TRIGGER: when does this workflow run?
+name: CI/CD — Test + Build + Push
+
 on:
   push:
-    branches: [ main ]             # runs on every push to main
+    branches: [ main ]
   pull_request:
-    branches: [ main ]             # runs on every PR targeting main
+    branches: [ main ]
 
-# JOBS: what does it do?
 jobs:
+
+  # ── JOB 1: test ─────────────────────────────────────────────────────────────
+  # Runs on every push AND pull_request.
+  # If any test fails, this job fails and job 2 never starts.
+
   test:
     name: Run API Tests
-    runs-on: ubuntu-latest         # GitHub provides a fresh Ubuntu VM
+    runs-on: ubuntu-latest
 
     steps:
-
-      # Step 1: Get the code
       - name: Checkout repository
         uses: actions/checkout@v4
-        # This clones your repo into the VM.
-        # Without this — the VM has no code to run.
 
-      # Step 2: Set up Python
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"             # cache pip downloads — speeds up reruns
+          cache: "pip"
 
-      # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest httpx
 
-      # Step 4: Train the model
       - name: Train fraud detection model
         run: python train_and_save_model.py
-        # fraud_model.pkl is NOT committed to Git (it's in .gitignore).
-        # We regenerate it here from the training script.
-        # This guarantees the model matches the current codebase.
 
-      # Step 5: Run the test suite
       - name: Run pytest
         run: pytest tests/ -v
-        # If any test fails → this step fails → the whole job fails →
-        # GitHub shows a red ✗ on the commit and blocks the PR merge.
-        #
-        # If all tests pass → green ✓ on the commit.
+
+
+  # ── JOB 2: docker ───────────────────────────────────────────────────────────
+  # Runs ONLY on push to main (not on pull_request).
+  # Runs ONLY if job 1 passed (needs: test).
+  # Builds the optimised Docker image and pushes it to GHCR.
+
+  docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test                      # ← waits for test job to succeed
+    if: github.event_name == 'push'  # ← skips on pull_request
+
+    # This job needs permission to write packages to GHCR
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      # ── Step 1: Get the code ─────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Log in to GitHub Container Registry ──────────────────────────
+      # GITHUB_TOKEN is a special secret that GitHub creates automatically
+      # for every workflow run. No setup needed.
+      # It authenticates as the user who triggered the push.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Step 3: Extract metadata for image tags ───────────────────────────────
+      # This action reads the commit SHA, branch name, and other metadata.
+      # It generates sensible image tags automatically:
+      #   ghcr.io/<owner>/fraud-api:main
+      #   ghcr.io/<owner>/fraud-api:sha-a1b2c3d
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/fraud-api
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+
+      # ── Step 4: Build and push the image ─────────────────────────────────────
+      # build-push-action runs docker build and docker push in one step.
+      # cache-from / cache-to: reuses layer cache from previous builds
+      # so pip install doesn't re-run unless requirements.txt changes.
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha          # read cache from GitHub Actions cache
+          cache-to: type=gha,mode=max   # write cache back for next run
