@@ -41,3 +41,7 @@ Dockerfile.bug3
 .vscode/
 .git/
 .gitignore
+
+data/
+models/
+reports/

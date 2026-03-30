@@ -1,0 +1,43 @@
+# .github/workflows/pipeline.yml
+#
+# Runs the fraud detection pipeline automatically.
+#
+# Two triggers:
+#   1. Schedule — runs every day at 2 AM UTC
+#   2. Manual   — click "Run workflow" in the GitHub Actions tab any time
+
+name: Fraud Detection Pipeline
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 2 AM UTC every day
+  workflow_dispatch:       # manual trigger button in GitHub UI
+
+jobs:
+  run-pipeline:
+    name: Run ML Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        run: python pipeline/run_pipeline.py
+
+      # Upload the metrics file so you can download it from the GitHub UI
+      # even after the VM is destroyed.
+      - name: Upload metrics report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-metrics
+          path: reports/metrics.json

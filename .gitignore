@@ -22,3 +22,7 @@ fraud_model.pkl
 
 \.env
 .env
+
+data/
+models/
+reports/
