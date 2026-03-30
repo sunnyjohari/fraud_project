@@ -3,12 +3,7 @@
 # Three jobs:
 #   1. test   — pytest on every push + PR
 #   2. docker — build + push to GHCR (push to main only, after tests pass)
-#   3. deploy — SSH into server, pull latest image, restart (after docker job)
-#
-# GitHub Secrets required for job 3 (set in repo Settings → Secrets):
-#   SSH_HOST        — your server's IP address
-#   SSH_USER        — ssh username (root for DigitalOcean)
-#   SSH_PRIVATE_KEY — contents of your private key (~/.ssh/id_rsa)
+#   3. deploy - (after docker job)
 
 name: CI/CD — Test + Build + Deploy
 
@@ -94,13 +89,6 @@ jobs:
 
 
   # ── JOB 3: deploy ────────────────────────────────────────────────────────────
-  # SSH into the server, pull the new image, restart the container.
-  # Runs only after the docker job succeeds.
-  #
-  # Required GitHub Secrets (Settings → Secrets and variables → Actions):
-  #   SSH_HOST        — server IP address  e.g. 143.198.xxx.xxx
-  #   SSH_USER        — ssh user           e.g. root
-  #   SSH_PRIVATE_KEY — private key text   paste full contents of ~/.ssh/id_rsa
 
   deploy:
     name: Deploy to Railway
@@ -110,4 +98,4 @@ jobs:
 
     steps:
       - name: Trigger Railway Deploy
-        run: echo "🚀 Railway auto deploy triggered"
+        run: echo "Railway auto deploy triggered"
