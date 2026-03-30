@@ -99,3 +99,53 @@ jobs:
     steps:
       - name: Trigger Railway Deploy
         run: echo "Railway auto deploy triggered"
+
+  # ── JOB 4: verify ────────────────────────────────────────────────────────────
+  #
+  # Runs after the deploy job.
+  # Hits the health endpoint and the /predict endpoint from the CI runner.
+  # If either fails — the whole pipeline fails and the team is notified.
+  #
+  # This is the difference between "the deploy commands ran" and
+  # "the API is actually alive and serving predictions correctly".
+
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.event_name == 'push'
+
+    steps:
+
+      # Wait for Railway deployment (slightly longer than VM)
+      - name: Wait for API to start
+        run: sleep 20
+
+      # Health check
+      - name: Health check
+        run: |
+          echo "Checking health endpoint..."
+          curl --fail --silent --show-error \
+            ${{ secrets.RAILWAY_URL }}/
+          echo ""
+          echo "Health check passed."
+
+      # Smoke test
+      - name: Smoke test — predict endpoint
+        run: |
+          echo "Running smoke test against /predict ..."
+
+          RESPONSE=$(curl --fail --silent --show-error \
+            -X POST ${{ secrets.RAILWAY_URL }}/predict \
+            -H "Content-Type: application/json" \
+            -d '{"amount": 8500, "time_of_day": 2.3, "merchant_risk": 0.92}')
+
+          echo "Response: ${RESPONSE}"
+
+          echo "${RESPONSE}" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          assert data['is_fraud'] == True, f'Expected fraud=True, got: {data}'
+          assert data['fraud_probability'] > 0.5, f'Expected prob > 0.5, got: {data}'
+          print('Smoke test PASSED — model is serving correct predictions.')
+          "
