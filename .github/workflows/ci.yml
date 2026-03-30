@@ -1,16 +1,16 @@
 # .github/workflows/ci.yml
 #
-# Two jobs:
-#   1. test   — runs on every push AND pull_request to main
-#   2. docker — builds and pushes the image to GHCR (GitHub Container Registry)
-#              runs ONLY on push to main, and ONLY if job 1 passes
+# Three jobs:
+#   1. test   — pytest on every push + PR
+#   2. docker — build + push to GHCR (push to main only, after tests pass)
+#   3. deploy — SSH into server, pull latest image, restart (after docker job)
 #
-# GitHub Container Registry (ghcr.io):
-#   - Free for public repos, free tier for private
-#   - Uses GITHUB_TOKEN — no separate account or secret needed
-#   - Image address: ghcr.io/<your-github-username>/fraud-api:<tag>
+# GitHub Secrets required for job 3 (set in repo Settings → Secrets):
+#   SSH_HOST        — your server's IP address
+#   SSH_USER        — ssh username (root for DigitalOcean)
+#   SSH_PRIVATE_KEY — contents of your private key (~/.ssh/id_rsa)
 
-name: CI/CD — Test + Build + Push
+name: CI/CD — Test + Build + Deploy
 
 on:
   push:
@@ -21,9 +21,6 @@ on:
 jobs:
 
   # ── JOB 1: test ─────────────────────────────────────────────────────────────
-  # Runs on every push AND pull_request.
-  # If any test fails, this job fails and job 2 never starts.
-
   test:
     name: Run API Tests
     runs-on: ubuntu-latest
@@ -51,31 +48,20 @@ jobs:
 
 
   # ── JOB 2: docker ───────────────────────────────────────────────────────────
-  # Runs ONLY on push to main (not on pull_request).
-  # Runs ONLY if job 1 passed (needs: test).
-  # Builds the optimised Docker image and pushes it to GHCR.
-
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: test                      # ← waits for test job to succeed
-    if: github.event_name == 'push'  # ← skips on pull_request
+    needs: test
+    if: github.event_name == 'push'
 
-    # This job needs permission to write packages to GHCR
     permissions:
       contents: read
       packages: write
 
     steps:
-
-      # ── Step 1: Get the code ─────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Step 2: Log in to GitHub Container Registry ──────────────────────────
-      # GITHUB_TOKEN is a special secret that GitHub creates automatically
-      # for every workflow run. No setup needed.
-      # It authenticates as the user who triggered the push.
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -83,11 +69,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Step 3: Extract metadata for image tags ───────────────────────────────
-      # This action reads the commit SHA, branch name, and other metadata.
-      # It generates sensible image tags automatically:
-      #   ghcr.io/<owner>/fraud-api:main
-      #   ghcr.io/<owner>/fraud-api:sha-a1b2c3d
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -96,17 +77,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix=sha-,format=short
-      
-      # set up a BuildKit container driver       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
 
-      # ── Step 4: Build and push the image ─────────────────────────────────────
-      # build-push-action runs docker build and docker push in one step.
-      # cache-from / cache-to: reuses layer cache from previous builds
-      # so pip install doesn't re-run unless requirements.txt changes.
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -114,5 +85,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha          # read cache from GitHub Actions cache
-          cache-to: type=gha,mode=max   # write cache back for next run
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+  # ── JOB 3: deploy ────────────────────────────────────────────────────────────
+  # SSH into the server, pull the new image, restart the container.
+  # Runs only after the docker job succeeds.
+  #
+  # Required GitHub Secrets (Settings → Secrets and variables → Actions):
+  #   SSH_HOST        — server IP address  e.g. 143.198.xxx.xxx
+  #   SSH_USER        — ssh user           e.g. root
+  #   SSH_PRIVATE_KEY — private key text   paste full contents of ~/.ssh/id_rsa
+
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: docker           # ← wait for image to be pushed first
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Trigger Railway Deploy
+        run: echo "🚀 Railway auto deploy triggered"

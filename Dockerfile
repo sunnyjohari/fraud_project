@@ -31,6 +31,7 @@ WORKDIR /app
 ENV MODEL_PATH=/app/fraud_model.pkl
 ENV FRAUD_THRESHOLD=0.5
 ENV LOG_LEVEL=info
+ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
 
@@ -42,5 +43,5 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY --from=builder /app/main.py         ./main.py
 COPY --from=builder /app/fraud_model.pkl ./fraud_model.pkl
 
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+#EXPOSE 8000
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
