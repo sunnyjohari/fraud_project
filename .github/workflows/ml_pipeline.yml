@@ -47,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: fraud-model
-          path: fraud_model.pkl
+          path: models/fraud_model.pkl
 
   docker:
     name: Build Docker Image
