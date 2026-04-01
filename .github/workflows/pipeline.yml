@@ -10,7 +10,7 @@ name: Fraud Detection Pipeline
 
 on:
   schedule:
-    - cron: "0 2 * * *"   # 2 AM UTC every day
+    - cron: "0 2 * * 1"   # 2 AM UTC every day
   workflow_dispatch:       # manual trigger button in GitHub UI
 
 jobs:

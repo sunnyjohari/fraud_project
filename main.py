@@ -11,11 +11,13 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 import joblib
 import numpy as np
+from pathlib import Path
 
 # Constants — read from environment variables
 # In Docker: set by ENV in Dockerfile or -e flag at runtime.
 # Locally:   fall back to the defaults in the second argument of os.getenv().
-MODEL_PATH      = os.getenv("MODEL_PATH",      "fraud_model.pkl")
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH      = os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "fraud_model.pkl"))
 FRAUD_THRESHOLD = float(os.getenv("FRAUD_THRESHOLD", "0.5"))
 
 _prediction_cache: dict = {}
